@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package product;
+
+option go_package = "./product";
+
+message ProductInfoRequest {
+  int64 product_id = 1;
+}
+
+message ProductInfoResponse {
+  int64 product_id = 1;
+  string name = 2;
+  string description = 3;
+  float price = 4;
+  int64 stock = 5;
+}
+
+message ReduceStockRequest {
+  int64 product_id = 1;
+  int64 quantity = 2;
+}
+
+message ReduceStockResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+service Product {
+  rpc GetProductInfo(ProductInfoRequest) returns (ProductInfoResponse);
+  rpc ReduceStock(ReduceStockRequest) returns (ReduceStockResponse);
+}
+

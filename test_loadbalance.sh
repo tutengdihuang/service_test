@@ -1,0 +1,80 @@
+#!/bin/bash
+
+# 负载均衡测试脚本
+
+set -e
+
+echo "=========================================="
+echo "开始负载均衡轮询测试"
+echo "=========================================="
+
+# 清理函数
+cleanup() {
+    echo ""
+    echo "清理进程..."
+    kill $USER_PID $PRODUCT_PID $TRADE1_PID $TRADE2_PID 2>/dev/null || true
+    wait 2>/dev/null || true
+    echo "测试完成"
+}
+
+trap cleanup EXIT INT TERM
+
+# 启动 user 服务
+echo "启动 user 服务 (端口 9001)..."
+cd rpc/user
+go run user.go -f etc/user_direct.yaml > /tmp/user.log 2>&1 &
+USER_PID=$!
+cd ../..
+sleep 2
+
+# 启动 product 服务
+echo "启动 product 服务 (端口 9002)..."
+cd rpc/product
+go run product.go -f etc/product_direct.yaml > /tmp/product.log 2>&1 &
+PRODUCT_PID=$!
+cd ../..
+sleep 2
+
+# 启动 trade 实例 1
+echo "启动 trade 实例 1 (端口 9003)..."
+cd rpc/trade
+go run trade.go -f etc/trade1_direct.yaml > /tmp/trade1.log 2>&1 &
+TRADE1_PID=$!
+cd ../..
+sleep 2
+
+# 启动 trade 实例 2
+echo "启动 trade 实例 2 (端口 9004)..."
+cd rpc/trade
+go run trade.go -f etc/trade2_direct.yaml > /tmp/trade2.log 2>&1 &
+TRADE2_PID=$!
+cd ../..
+sleep 3
+
+echo ""
+echo "所有服务已启动！"
+echo "User PID: $USER_PID"
+echo "Product PID: $PRODUCT_PID"
+echo "Trade1 PID: $TRADE1_PID (端口 9003)"
+echo "Trade2 PID: $TRADE2_PID (端口 9004)"
+echo ""
+
+# 等待服务就绪
+echo "等待服务就绪..."
+sleep 2
+
+# 运行测试客户端
+echo "=========================================="
+echo "开始运行负载均衡测试..."
+echo "=========================================="
+echo ""
+
+cd test_loadbalance
+go mod tidy > /dev/null 2>&1
+go run main.go
+
+echo ""
+echo "=========================================="
+echo "测试完成"
+echo "=========================================="
+

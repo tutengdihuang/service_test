@@ -1,0 +1,13 @@
+package config
+
+import (
+	"github.com/zeromicro/go-zero/zrpc"
+)
+
+type Config struct {
+	zrpc.RpcServerConf
+	UserRpc    zrpc.RpcClientConf
+	ProductRpc zrpc.RpcClientConf
+	InstanceId string `json:",optional"` // 实例标识
+}
+

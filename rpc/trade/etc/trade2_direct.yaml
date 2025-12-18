@@ -1,0 +1,17 @@
+Name: trade.rpc
+ListenOn: 0.0.0.0:9004
+Mode: dev
+
+UserRpc:
+  Target: 127.0.0.1:9001
+  NonBlock: true
+  Timeout: 300000
+
+ProductRpc:
+  Target: 127.0.0.1:9002
+  NonBlock: true
+  Timeout: 300000
+
+# 实例标识，用于区分不同实例
+InstanceId: "trade-instance-2"
+

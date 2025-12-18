@@ -1,0 +1,8 @@
+Name: product.rpc
+ListenOn: 0.0.0.0:9002
+Etcd:
+  Hosts:
+    - 127.0.0.1:2379
+  Key: product.rpc
+Mode: dev
+

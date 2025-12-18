@@ -1,0 +1,20 @@
+Name: trade.rpc
+ListenOn: 0.0.0.0:9003
+Etcd:
+  Hosts:
+    - 127.0.0.1:2379
+  Key: trade.rpc
+Mode: dev
+
+UserRpc:
+  Etcd:
+    Hosts:
+      - 127.0.0.1:2379
+    Key: user.rpc
+
+ProductRpc:
+  Etcd:
+    Hosts:
+      - 127.0.0.1:2379
+    Key: product.rpc
+
