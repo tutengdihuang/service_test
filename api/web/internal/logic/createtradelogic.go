@@ -38,8 +38,7 @@ func (l *CreateTradeLogic) CreateTrade(req *types.CreateTradeRequest) (resp *typ
 		UserId:      tradeResp.UserId,
 		ProductId:   tradeResp.ProductId,
 		Quantity:    tradeResp.Quantity,
-		TotalAmount: tradeResp.TotalAmount,
+		TotalAmount: float64(tradeResp.TotalAmount),
 		Status:      tradeResp.Status,
 	}, nil
 }
-

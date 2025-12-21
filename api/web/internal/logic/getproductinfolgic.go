@@ -35,8 +35,7 @@ func (l *GetProductInfoLogic) GetProductInfo(req *types.GetProductInfoRequest) (
 		ProductId:   productResp.ProductId,
 		Name:        productResp.Name,
 		Description: productResp.Description,
-		Price:       productResp.Price,
+		Price:       float64(productResp.Price),
 		Stock:       productResp.Stock,
 	}, nil
 }
-

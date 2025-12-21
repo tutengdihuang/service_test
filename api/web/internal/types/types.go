@@ -3,6 +3,14 @@
 
 package types
 
+type GetUserInfoRequest struct {
+	UserId int64 `path:"user_id"`
+}
+
+type GetProductInfoRequest struct {
+	ProductId int64 `path:"product_id"`
+}
+
 type CreateTradeRequest struct {
 	UserId    int64 `json:"user_id"`
 	ProductId int64 `json:"product_id"`

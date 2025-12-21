@@ -2,7 +2,6 @@ package logic
 
 import (
 	"context"
-
 	"service_test/rpc/product/internal/svc"
 	"service_test/rpc/product/product"
 
@@ -24,7 +23,23 @@ func NewGetProductInfoLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Ge
 }
 
 func (l *GetProductInfoLogic) GetProductInfo(in *product.ProductInfoRequest) (*product.ProductInfoResponse, error) {
-	// todo: add your logic here and delete this line
+	p, ok := l.svcCtx.ProductModel.GetProduct(in.ProductId)
+	if !ok {
+		return &product.ProductInfoResponse{
+			ProductId:  0,
+			Name:       "",
+			Description: "",
+			Price:      0,
+			Stock:      0,
+		}, nil
+	}
 
-	return &product.ProductInfoResponse{}, nil
+	return &product.ProductInfoResponse{
+		ProductId:   p.ProductId,
+		Name:        p.Name,
+		Description: p.Description,
+		Price:       float32(p.Price),
+		Stock:       p.Stock,
+	}, nil
 }
+

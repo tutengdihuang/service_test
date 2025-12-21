@@ -2,9 +2,9 @@ package logic
 
 import (
 	"context"
-
 	"service_test/api/web/internal/svc"
 	"service_test/api/web/internal/types"
+	"service_test/rpc/product/productclient"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )
@@ -23,8 +23,20 @@ func NewGetProductInfoLogic(ctx context.Context, svcCtx *svc.ServiceContext) *Ge
 	}
 }
 
-func (l *GetProductInfoLogic) GetProductInfo() (resp *types.ProductInfoResponse, err error) {
-	// todo: add your logic here and delete this line
+func (l *GetProductInfoLogic) GetProductInfo(req *types.GetProductInfoRequest) (resp *types.ProductInfoResponse, err error) {
+	productResp, err := l.svcCtx.ProductRpc.GetProductInfo(l.ctx, &productclient.ProductInfoRequest{
+		ProductId: req.ProductId,
+	})
+	if err != nil {
+		return nil, err
+	}
 
-	return
+	return &types.ProductInfoResponse{
+		ProductId:   productResp.ProductId,
+		Name:        productResp.Name,
+		Description: productResp.Description,
+		Price:       float64(productResp.Price),
+		Stock:       productResp.Stock,
+	}, nil
 }
+

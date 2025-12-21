@@ -26,11 +26,11 @@ func (l *GetProductInfoLogic) GetProductInfo(in *product.ProductInfoRequest) (*p
 	p, ok := l.svcCtx.ProductModel.GetProduct(in.ProductId)
 	if !ok {
 		return &product.ProductInfoResponse{
-			ProductId:  0,
-			Name:       "",
+			ProductId:   0,
+			Name:        "",
 			Description: "",
-			Price:      0,
-			Stock:      0,
+			Price:       0,
+			Stock:       0,
 		}, nil
 	}
 
@@ -38,8 +38,7 @@ func (l *GetProductInfoLogic) GetProductInfo(in *product.ProductInfoRequest) (*p
 		ProductId:   p.ProductId,
 		Name:        p.Name,
 		Description: p.Description,
-		Price:       p.Price,
+		Price:       float32(p.Price),
 		Stock:       p.Stock,
 	}, nil
 }
-
