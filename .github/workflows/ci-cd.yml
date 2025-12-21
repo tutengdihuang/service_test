@@ -137,7 +137,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ${{ matrix.service.dockerfile }}
+          file: dockerfiles/${{ matrix.service.dockerfile }}
           build-args: |
             SERVICE_PATH=${{ matrix.service.path }}
           push: ${{ github.event_name != 'pull_request' }}
@@ -249,4 +249,3 @@ jobs:
           else
             echo "Web service not found, skipping health check"
           fi
-
