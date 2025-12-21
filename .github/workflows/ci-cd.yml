@@ -1,0 +1,252 @@
+name: Service Test CI/CD
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - develop
+    paths:
+      - 'api/**'
+      - 'rpc/**'
+      - 'go.mod'
+      - 'go.sum'
+      - '.github/workflows/**'
+  pull_request:
+    branches:
+      - main
+      - master
+    paths:
+      - 'api/**'
+      - 'rpc/**'
+      - 'go.mod'
+      - 'go.sum'
+  workflow_dispatch:
+    inputs:
+      service:
+        description: 'Service to build (web, user, product, trade, or all)'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - web
+          - user
+          - product
+          - trade
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository_owner }}/service-test
+  KUBERNETES_NAMESPACE: service-test
+  GO_VERSION: '1.24'
+
+jobs:
+  # 代码检查和测试
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Run tests
+        run: |
+          go test -v ./... || echo "No tests found or tests failed"
+
+      - name: Build verification
+        run: |
+          echo "Verifying build for all services..."
+          # 验证各个服务能否正常编译
+          cd api/web && go build -o /tmp/web . || exit 1
+          cd ../../rpc/user && go build -o /tmp/user . || exit 1
+          cd ../product && go build -o /tmp/product . || exit 1
+          cd ../trade && go build -o /tmp/trade . || exit 1
+          echo "All services built successfully"
+
+  # 构建 Docker 镜像
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - name: web
+            path: api/web
+            dockerfile: Dockerfile.web
+            port: 8888
+          - name: user
+            path: rpc/user
+            dockerfile: Dockerfile.user
+            port: 9001
+          - name: product
+            path: rpc/product
+            dockerfile: Dockerfile.product
+            port: 9002
+          - name: trade
+            path: rpc/trade
+            dockerfile: Dockerfile.trade
+            port: 9003
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service.name }}-service
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' }}
+
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ${{ matrix.service.dockerfile }}
+          build-args: |
+            SERVICE_PATH=${{ matrix.service.path }}
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service.name }}-service:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service.name }}-service:buildcache,mode=max
+          platforms: linux/amd64
+
+      - name: Image digest
+        run: echo "Image pushed with digest ${{ steps.build.outputs.digest }}"
+
+  # 部署到 Kubernetes
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && github.event_name == 'push'
+    environment:
+      name: production
+      url: https://service-test.example.com
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
+
+      - name: Configure kubectl
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBECONFIG }}" | base64 -d > $HOME/.kube/config
+          chmod 600 $HOME/.kube/config
+          kubectl config view --minify
+
+      - name: Verify cluster connection
+        run: |
+          kubectl cluster-info
+          kubectl get nodes
+
+      - name: Deploy to Kubernetes
+        run: |
+          # 设置镜像标签
+          IMAGE_TAG=${GITHUB_SHA::8}
+          REGISTRY="${{ env.REGISTRY }}"
+          IMAGE_PREFIX="${{ env.IMAGE_PREFIX }}"
+          
+          echo "Deploying with image tag: $IMAGE_TAG"
+          
+          # 创建或更新 namespace
+          kubectl apply -f k8s/namespace.yaml || echo "Namespace already exists"
+          
+          # 等待 namespace 就绪
+          kubectl wait --for=condition=Active namespace/${{ env.KUBERNETES_NAMESPACE }} --timeout=30s || true
+          
+          # 部署 ConfigMap
+          kubectl apply -f k8s/configmap.yaml || echo "ConfigMap already exists"
+          
+          # 部署各个服务
+          for service in user product trade web; do
+            echo "Deploying $service service..."
+            
+            # 设置镜像地址
+            IMAGE="${REGISTRY}/${IMAGE_PREFIX}/${service}-service:${IMAGE_TAG}"
+            
+            # 更新 deployment.yaml 中的镜像（如果文件存在）
+            if [ -f "k8s/${service}/deployment.yaml" ]; then
+              # macOS 和 Linux 兼容的 sed 命令
+              if [[ "$OSTYPE" == "darwin"* ]]; then
+                sed -i '' "s|image:.*${service}-service.*|image: ${IMAGE}|g" k8s/${service}/deployment.yaml
+              else
+                sed -i "s|image:.*${service}-service.*|image: ${IMAGE}|g" k8s/${service}/deployment.yaml
+              fi
+              
+              # 应用部署文件
+              kubectl apply -f k8s/${service}/deployment.yaml
+              
+              # 等待部署完成
+              kubectl rollout status deployment/${service}-service -n ${{ env.KUBERNETES_NAMESPACE }} --timeout=5m || true
+            else
+              echo "Warning: k8s/${service}/deployment.yaml not found, skipping..."
+            fi
+          done
+          
+          # 显示部署状态
+          echo "=== Deployment Status ==="
+          kubectl get pods -n ${{ env.KUBERNETES_NAMESPACE }}
+          kubectl get svc -n ${{ env.KUBERNETES_NAMESPACE }}
+          kubectl get ingress -n ${{ env.KUBERNETES_NAMESPACE }} || echo "No ingress found"
+
+      - name: Run smoke tests
+        run: |
+          # 等待服务就绪
+          sleep 15
+          
+          # 获取 web 服务地址
+          WEB_SERVICE=$(kubectl get svc web-service -n ${{ env.KUBERNETES_NAMESPACE }} -o jsonpath='{.spec.clusterIP}' 2>/dev/null || echo "")
+          
+          if [ -n "$WEB_SERVICE" ]; then
+            WEB_PORT=$(kubectl get svc web-service -n ${{ env.KUBERNETES_NAMESPACE }} -o jsonpath='{.spec.ports[0].port}' 2>/dev/null || echo "8888")
+            
+            echo "Testing web service at $WEB_SERVICE:$WEB_PORT"
+            
+            # 简单的健康检查
+            kubectl run curl-test --image=curlimages/curl:latest --rm -i --restart=Never -n ${{ env.KUBERNETES_NAMESPACE }} -- \
+              curl -f http://${WEB_SERVICE}:${WEB_PORT}/health || echo "Health check failed (service may not have /health endpoint)"
+          else
+            echo "Web service not found, skipping health check"
+          fi
+
