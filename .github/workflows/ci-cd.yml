@@ -153,6 +153,9 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+      packages: write  # 需要写入权限来推送 Docker 镜像到 GitHub Container Registry
     strategy:
       fail-fast: false
       matrix:
