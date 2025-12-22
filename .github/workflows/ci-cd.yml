@@ -35,6 +35,11 @@ on:
           - product
           - trade
 
+# 全局权限设置 - 允许推送到 GitHub Container Registry
+permissions:
+  contents: read
+  packages: write
+
 env:
   REGISTRY: ghcr.io
   IMAGE_PREFIX: ${{ github.repository_owner }}/service-test
