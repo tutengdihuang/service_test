@@ -19,18 +19,16 @@ spec:
     spec:
       containers:
       - name: web
-        image: ghcr.io/your-org/service-test/web-service:latest  # 会被 CI/CD 替换
+        image: ghcr.io/tutengdihuang/service-test/web-service:latest  # 会被 CI/CD 替换
         imagePullPolicy: Always
         ports:
         - containerPort: 8888
           name: http
           protocol: TCP
-        env:
-        - name: ETCD_ENDPOINTS
-          valueFrom:
-            configMapKeyRef:
-              name: etcd-config
-              key: etcd-endpoints
+        volumeMounts:
+        - name: config
+          mountPath: /app/etc
+          readOnly: true
         resources:
           requests:
             memory: "128Mi"
@@ -54,6 +52,10 @@ spec:
           periodSeconds: 5
           timeoutSeconds: 3
           failureThreshold: 3
+      volumes:
+      - name: config
+        configMap:
+          name: web-service-config
 ---
 apiVersion: v1
 kind: Service

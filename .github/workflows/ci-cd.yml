@@ -228,7 +228,7 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
-    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && github.event_name == 'push'
     environment:
       name: production
       url: https://service-test.example.com
@@ -279,6 +279,12 @@ jobs:
           
           # 部署 ConfigMap
           kubectl apply -f k8s/configmap.yaml || echo "ConfigMap already exists"
+          
+          # 从 etc 目录创建服务配置 ConfigMap
+          kubectl create configmap user-service-config --from-file=user.yaml=k8s/etc/user.yaml -n service-test --dry-run=client -o yaml | kubectl apply -f -
+          kubectl create configmap product-service-config --from-file=product.yaml=k8s/etc/product.yaml -n service-test --dry-run=client -o yaml | kubectl apply -f -
+          kubectl create configmap trade-service-config --from-file=trade.yaml=k8s/etc/trade.yaml -n service-test --dry-run=client -o yaml | kubectl apply -f -
+          kubectl create configmap web-service-config --from-file=web.yaml=k8s/etc/web.yaml -n service-test --dry-run=client -o yaml | kubectl apply -f -
           
           # 部署各个服务
           for service in user product trade web; do
@@ -331,5 +337,3 @@ jobs:
           else
             echo "Web service not found, skipping health check"
           fi
-
-
