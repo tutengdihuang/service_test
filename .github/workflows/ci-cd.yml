@@ -241,7 +241,7 @@ jobs:
         run: |
           echo "=== 验证部署状态 ==="
           echo "当前提交: $(git rev-parse HEAD)"
-          echo "镜像标签: ${GITHUB_SHA::8}"
+          echo "镜像标签: ${GITHUB_SHA::7}"
 
       - name: Set up kubectl
         uses: azure/setup-kubectl@v3
@@ -263,7 +263,7 @@ jobs:
       - name: Deploy to Kubernetes
         run: |
           # 设置镜像标签
-          IMAGE_TAG=${GITHUB_SHA::8}
+          IMAGE_TAG=${GITHUB_SHA::7}
           REGISTRY="${{ env.REGISTRY }}"
           IMAGE_PREFIX="${{ env.IMAGE_PREFIX }}"
           
