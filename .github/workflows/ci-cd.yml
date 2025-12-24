@@ -30,7 +30,7 @@ permissions:
   packages: write
 
 env:
-  REGISTRY: registry.cn-hangzhou.aliyuncs.com
+  REGISTRY: crpi-j9gshcbjtb1i6c7h.cn-hangzhou.personal.cr.aliyuncs.com
   IMAGE_PREFIX: tutengdihuang
   KUBERNETES_NAMESPACE: service-test
   GO_VERSION: '1.24'
