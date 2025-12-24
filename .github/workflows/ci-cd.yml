@@ -6,21 +6,10 @@ on:
       - main
       - master
       - develop
-    paths:
-      - 'api/**'
-      - 'rpc/**'
-      - 'go.mod'
-      - 'go.sum'
-      - '.github/workflows/**'
   pull_request:
     branches:
       - main
       - master
-    paths:
-      - 'api/**'
-      - 'rpc/**'
-      - 'go.mod'
-      - 'go.sum'
   workflow_dispatch:
     inputs:
       service:
