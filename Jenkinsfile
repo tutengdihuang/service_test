@@ -1,11 +1,10 @@
 // Jenkins Pipeline for go-zero microservices
-// 构建并部署到 K8s 集群
 // 代码仓库: https://github.com/tutengdihuang/service_test.git
+// 镜像仓库: Harbor (182.42.82.135:30002)
 
 pipeline {
     agent any
     
-    // GitHub Webhook 触发
     triggers {
         githubPush()
     }
@@ -18,9 +17,7 @@ pipeline {
         
         // K8s 配置
         K8S_NAMESPACE = 'service-test'
-        
-        // Go 配置
-        GOPROXY = 'https://goproxy.cn,direct'
+        KUBECONFIG = '/var/jenkins_home/.kube/config'
     }
     
     stages {
@@ -29,13 +26,19 @@ pipeline {
                 echo "=== 拉取代码 ==="
                 checkout scm
                 sh 'git log -1 --oneline'
+                sh 'ls -la'
             }
         }
         
         stage('Build & Push Images') {
             steps {
                 script {
-                    def services = ['user', 'product', 'trade', 'web']
+                    def services = [
+                        [name: 'user', dockerfile: 'dockerfiles/Dockerfile.user'],
+                        [name: 'product', dockerfile: 'dockerfiles/Dockerfile.product'],
+                        [name: 'trade', dockerfile: 'dockerfiles/Dockerfile.trade'],
+                        [name: 'web', dockerfile: 'dockerfiles/Dockerfile.web']
+                    ]
                     
                     // 登录 Harbor
                     withCredentials([usernamePassword(
@@ -47,26 +50,27 @@ pipeline {
                     }
                     
                     // 构建每个服务
-                    services.each { service ->
-                        def imageName = "${HARBOR_URL}/${HARBOR_PROJECT}/${service}-service"
+                    services.each { svc ->
+                        def imageName = "${HARBOR_URL}/${HARBOR_PROJECT}/${svc.name}-service"
                         def imageTag = "${env.BUILD_NUMBER}"
                         
-                        echo "=== 构建 ${service} 服务 ==="
+                        echo "=== 构建 ${svc.name} 服务 ==="
                         
                         sh """
                             docker build \
-                                -f dockerfiles/Dockerfile.${service} \
+                                -f ${svc.dockerfile} \
                                 -t ${imageName}:${imageTag} \
                                 -t ${imageName}:latest \
                                 .
                         """
                         
-                        echo "=== 推送 ${service} 镜像到 Harbor ==="
+                        echo "=== 推送 ${svc.name} 镜像到 Harbor ==="
                         sh """
                             docker push ${imageName}:${imageTag}
                             docker push ${imageName}:latest
                         """
                         
+                        // 清理本地镜像
                         sh "docker rmi ${imageName}:${imageTag} || true"
                     }
                 }
@@ -76,18 +80,24 @@ pipeline {
         stage('Deploy to K8s') {
             steps {
                 script {
-                    def services = ['user', 'product', 'trade', 'web']
+                    // 服务名和容器名映射
+                    def services = [
+                        [name: 'user', container: 'user'],
+                        [name: 'product', container: 'product'],
+                        [name: 'trade', container: 'trade'],
+                        [name: 'web', container: 'web-service']
+                    ]
                     
-                    services.each { service ->
-                        def imageName = "${HARBOR_URL}/${HARBOR_PROJECT}/${service}-service"
+                    services.each { svc ->
+                        def imageName = "${HARBOR_URL}/${HARBOR_PROJECT}/${svc.name}-service"
                         def imageTag = "${env.BUILD_NUMBER}"
                         
-                        echo "=== 部署 ${service} 服务 ==="
+                        echo "=== 部署 ${svc.name} 服务 ==="
                         
                         sh """
-                            kubectl set image deployment/${service}-service \
-                                ${service}=${imageName}:${imageTag} \
-                                -n ${K8S_NAMESPACE} || echo "Deployment ${service}-service not found, skipping"
+                            kubectl set image deployment/${svc.name}-service \
+                                ${svc.container}=${imageName}:${imageTag} \
+                                -n ${K8S_NAMESPACE} || echo "Deployment ${svc.name}-service not found"
                         """
                     }
                 }
@@ -110,7 +120,7 @@ pipeline {
             echo '=== Pipeline 执行失败 ==='
         }
         always {
-            sh 'docker logout ${HARBOR_URL} || true'
+            sh "docker logout ${HARBOR_URL} || true"
         }
     }
 }
