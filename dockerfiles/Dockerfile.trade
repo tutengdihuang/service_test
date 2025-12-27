@@ -2,6 +2,9 @@ FROM golang:1.24-alpine AS builder
 
 WORKDIR /build
 
+# 设置 Go 代理为国内源
+ENV GOPROXY=https://goproxy.cn,direct
+
 RUN apk add --no-cache git make ca-certificates tzdata
 
 COPY go.mod go.sum ./
@@ -26,4 +29,3 @@ EXPOSE 9003
 
 ENTRYPOINT ["./trade"]
 CMD ["-f", "etc/trade.yaml"]
-
